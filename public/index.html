@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Java OOPs Calculator</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="calculator">
+    <h1>Calculator</h1>
+
+    <input type="text" id="display" value="0"
+           aria-label="Calculator display" readonly>
+
+    <div class="buttons">
+        <button class="utility" data-action="clear">AC</button>
+        <button class="utility" data-action="delete">DEL</button>
+        <button class="operator" data-operator="/">÷</button>
+        <button class="operator" data-operator="*">×</button>
+
+        <button data-digit="7">7</button>
+        <button data-digit="8">8</button>
+        <button data-digit="9">9</button>
+        <button class="operator" data-operator="-">−</button>
+
+        <button data-digit="4">4</button>
+        <button data-digit="5">5</button>
+        <button data-digit="6">6</button>
+        <button class="operator" data-operator="+">+</button>
+
+        <button data-digit="1">1</button>
+        <button data-digit="2">2</button>
+        <button data-digit="3">3</button>
+        <button class="equals" data-action="equals">=</button>
+
+        <button data-action="sign">+/−</button>
+        <button data-digit="0">0</button>
+        <button data-action="decimal">.</button>
+    </div>
+
+    <p id="status" role="status">Ready to calculate</p>
+</main>
+
+<script>
+const display = document.getElementById("display");
+const status = document.getElementById("status");
+
+let firstNumber = null;
+let operator = null;
+let waitingForSecond = false;
+let errorState = false;
+
+function reset() {
+    display.value = "0";
+    firstNumber = null;
+    operator = null;
+    waitingForSecond = false;
+    errorState = false;
+    status.textContent = "Ready to calculate";
+}
+
+function enterDigit(digit) {
+    if (errorState) reset();
+
+    if (waitingForSecond) {
+        display.value = digit;
+        waitingForSecond = false;
+    } else if (display.value === "0") {
+        display.value = digit;
+    } else if (display.value.length < 15) {
+        display.value += digit;
+    }
+}
+
+function enterDecimal() {
+    if (errorState) reset();
+
+    if (waitingForSecond) {
+        display.value = "0.";
+        waitingForSecond = false;
+    } else if (!display.value.includes(".")) {
+        display.value += ".";
+    }
+}
+
+function chooseOperator(op) {
+    if (errorState) reset();
+
+    if (operator && !waitingForSecond) {
+        calculate();
+        if (errorState) return;
+    }
+
+    firstNumber = Number(display.value);
+    operator = op;
+    waitingForSecond = true;
+    status.textContent = "Enter the next number";
+}
+
+async function calculate() {
+    if (firstNumber === null || !operator || waitingForSecond) return;
+
+    const a = firstNumber;
+    const b = Number(display.value);
+    const op = operator;
+    status.textContent = "Calculating with Java...";
+
+    try {
+        const query = new URLSearchParams({ a: String(a), b: String(b), op });
+        const response = await fetch("/calculate?" + query.toString());
+        const result = await response.text();
+
+        if (!response.ok) throw new Error(result);
+
+        const number = Number(result);
+        display.value = Number.isInteger(number)
+            ? String(number)
+            : String(Number(number.toPrecision(12)));
+
+        firstNumber = null;
+        operator = null;
+        waitingForSecond = true;
+        errorState = false;
+        status.textContent = "Calculation complete";
+    } catch (error) {
+        display.value = "Error";
+        status.textContent = error.message;
+        firstNumber = null;
+        operator = null;
+        waitingForSecond = true;
+        errorState = true;
+    }
+}
+
+function deleteLast() {
+    if (errorState) {
+        reset();
+        return;
+    }
+
+    if (!waitingForSecond) {
+        display.value = display.value.length > 1
+            ? display.value.slice(0, -1)
+            : "0";
+    }
+}
+
+function toggleSign() {
+    if (errorState) reset();
+
+    if (!waitingForSecond && Number(display.value) !== 0) {
+        display.value = String(-Number(display.value));
+    }
+}
+
+document.querySelector(".buttons").addEventListener("click", event => {
+    const button = event.target.closest("button");
+    if (!button) return;
+
+    if (button.dataset.digit !== undefined) {
+        enterDigit(button.dataset.digit);
+    } else if (button.dataset.operator) {
+        chooseOperator(button.dataset.operator);
+    } else {
+        switch (button.dataset.action) {
+            case "clear": reset(); break;
+            case "delete": deleteLast(); break;
+            case "decimal": enterDecimal(); break;
+            case "sign": toggleSign(); break;
+            case "equals": calculate(); break;
+        }
+    }
+});
+</script>
+</body>
+</html>
